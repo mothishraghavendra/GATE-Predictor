@@ -4,15 +4,22 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, URL
 import os
+import sys
 import logging
 from scraper import ResponseSheetScraper
 from predictor import MarkPredictor
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging (serverless-friendly)
+try:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        stream=sys.stdout,
+        force=True
+    )
+except Exception:
+    pass  # Ignore logging errors in serverless
+
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -20,22 +27,14 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-
 
 # Disable CSRF for serverless environments (Vercel)
 # CSRF protection doesn't work well with serverless due to stateless nature
-IS_SERVERLESS = os.environ.get('VERCEL', False) or os.environ.get('SERVERLESS', False)
+IS_SERVERLESS = os.environ.get('VERCEL') or os.environ.get('SERVERLESS')
 if not IS_SERVERLESS:
     csrf = CSRFProtect(app)
 else:
     app.config['WTF_CSRF_ENABLED'] = False
     logger.info("Running in serverless mode - CSRF protection disabled")
 
-# Configure Flask logging
-if not app.debug:
-    app.logger.setLevel(logging.INFO)
-    # Ensure logs go to stdout for cloud deployment platforms
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    app.logger.addHandler(handler)
+
 
 class URLForm(FlaskForm):
     response_sheet_url = StringField('Response Sheet URL', 
