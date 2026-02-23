@@ -17,7 +17,15 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
-csrf = CSRFProtect(app)
+
+# Disable CSRF for serverless environments (Vercel)
+# CSRF protection doesn't work well with serverless due to stateless nature
+IS_SERVERLESS = os.environ.get('VERCEL', False) or os.environ.get('SERVERLESS', False)
+if not IS_SERVERLESS:
+    csrf = CSRFProtect(app)
+else:
+    app.config['WTF_CSRF_ENABLED'] = False
+    logger.info("Running in serverless mode - CSRF protection disabled")
 
 # Configure Flask logging
 if not app.debug:
