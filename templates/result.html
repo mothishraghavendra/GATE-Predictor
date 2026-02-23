@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+<!-- {% block title %}Results - GATE Mark Predictor{% endblock %} -->
+
+{% block content %}
+<div class="results-container">
+    <div class="results-header">
+        <a href="/" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Back to Home
+        </a>
+        <h1 class="results-title">Your GATE Score Prediction</h1>
+        <p class="results-subtitle">Powered by <strong>serblabs.in</strong></p>
+    </div>
+
+    <!-- Candidate Information -->
+    {% if username %}
+    <div class="candidate-info-card">
+        <div class="candidate-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+        </div>
+        <div class="candidate-details">
+            <div class="candidate-name">{{ username }}</div>
+            {% if response_data.candidate_info and response_data.candidate_info.registration_number %}
+            <div class="candidate-reg">Registration: {{ response_data.candidate_info.registration_number }}</div>
+            {% endif %}
+            <div class="verification-badge">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                Verified from Response Sheet
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Hero Score Section -->
+    <div class="hero-score">
+        <div class="score-circle">
+            <div class="score-value-large">{{ predicted_marks.predicted_score | default(0) | round(2) }}</div>
+            <div class="score-label-large">out of 100</div>
+        </div>
+        <div class="score-info">
+            <div class="grade-display">
+                <span class="grade-text">{{ predicted_marks.grade | default('N/A') }}</span>
+            </div>
+            {% if predicted_marks.source == 'serblabs.in' %}
+            <div class="verified-badge">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M5.5 8L7 9.5L10.5 6" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="8" cy="8" r="7" stroke="#4CAF50" stroke-width="2"/>
+                </svg>
+                Verified by serblabs.in
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+<!-- Analytics Grid (Section, Type, Marking Details) -->
+<div class="analytics-grid">
+
+    <!-- Section Breakdown -->
+    {% if response_data.exam_info and response_data.exam_info.section_marks %}
+    <div class="analytics-card">
+        <div class="analytics-header">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="3" y="4" width="4" height="12" rx="1" fill="#667eea"/>
+                <rect x="8" y="7" width="4" height="9" rx="1" fill="#667eea"/>
+                <rect x="13" y="2" width="4" height="14" rx="1" fill="#667eea"/>
+            </svg>
+            <h3>Section Breakdown</h3>
+        </div>
+        <div class="analytics-body">
+            {% for section, marks in response_data.exam_info.section_marks.items() %}
+            <div class="stat-row">
+                <span class="stat-name">{{ section }}</span>
+                <span class="stat-value">
+                    <strong>{{ marks }}</strong>
+                    {% if response_data.exam_info.section_possible and response_data.exam_info.section_possible[section] %}
+                    <span class="stat-total">/ {{ response_data.exam_info.section_possible[section] }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Type Breakdown -->
+    {% if response_data.exam_info and response_data.exam_info.type_stats %}
+    <div class="analytics-card">
+        <div class="analytics-header">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="7" stroke="#764ba2" stroke-width="2" fill="none"/>
+                <circle cx="10" cy="10" r="3" fill="#764ba2"/>
+            </svg>
+            <h3>Type Breakdown</h3>
+        </div>
+        <div class="analytics-body">
+            {% for qtype, stats in response_data.exam_info.type_stats.items() %}
+            <div class="stat-row">
+                <span class="stat-name">{{ qtype }}</span>
+                <span class="stat-value">
+                    <span class="correct-badge">{{ stats.correct }}✓</span>
+                    <span class="wrong-badge">{{ stats.wrong }}✗</span>
+                    <span class="marks-badge">{{ stats.marks }}</span>
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Additional Information -->
+{% if response_data.normalized_marks or (response_data.candidate_info and (response_data.candidate_info.name or response_data.candidate_info.registration_number)) %}
+<div class="additional-info">
+    {% if response_data.normalized_marks %}
+    <div class="info-card-modern">
+        <div class="info-icon">⚖️</div>
+        <div class="info-content">
+            <h4>Normalized Marks</h4>
+            <p class="info-value">{{ response_data.normalized_marks | round(2) }}</p>
+            {% if response_data.normalized_rank %}
+            <p class="info-subtext">Rank: #{{ response_data.normalized_rank }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if response_data.candidate_info and (response_data.candidate_info.name or response_data.candidate_info.registration_number) %}
+    <div class="info-card-modern">
+        <div class="info-icon">👤</div>
+        <div class="info-content">
+            <h4>Candidate Information</h4>
+            {% if response_data.candidate_info.name %}
+            <p><strong>Name:</strong> {{ response_data.candidate_info.name }}</p>
+            {% endif %}
+            {% if response_data.candidate_info.registration_number %}
+            <p><strong>Registration:</strong> {{ response_data.candidate_info.registration_number }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="action-footer">
+    <a href="/" class="btn-primary-large">Predict Another Response Sheet</a>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Animate score on page load
+    window.addEventListener('load', function () {
+        const scoreElement = document.querySelector('.score-value-large');
+        if (!scoreElement) return;
+        
+        const targetScore = parseFloat(scoreElement.textContent);
+        let currentScore = 0;
+        const duration = 1500; // 1.5 seconds
+        const increment = targetScore / (duration / 16); // 60fps
+
+        const animation = setInterval(function () {
+            currentScore += increment;
+            if (currentScore >= targetScore) {
+                currentScore = targetScore;
+                clearInterval(animation);
+            }
+            scoreElement.textContent = currentScore.toFixed(2);
+        }, 16);
+    });
+</script>
+{% endblock %}

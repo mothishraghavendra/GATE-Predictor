@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Main Form Section -->
+<div class="form-section">
+    <div class="form-container-modern">
+        {% if error %}
+        <div class="alert alert-error">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div>
+                <strong>Error occurred</strong>
+                <p>{{ error }}</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        <form method="POST" action="/" class="url-form-modern">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    Response Sheet URL
+                </label>
+                
+                <div class="input-wrapper">
+                    {{ form.response_sheet_url(
+                        class="form-input-modern",
+                        placeholder="https://gate.iitb.ac.in/response/CS2026/12345",
+                        autocomplete="off"
+                    ) }}
+                    {% if form.response_sheet_url.errors %}
+                        <div class="form-error-modern">
+                            {% for error in form.response_sheet_url.errors %}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                                </svg>
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <small class="form-hint-modern">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                    Paste your GATE response sheet URL from the official portal
+                </small>
+            </div>
+            
+            <button type="submit" class="btn-submit-modern">
+                <span class="btn-text">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                    </svg>
+                    Predict My Marks
+                </span>
+                <span class="btn-loading">
+                    <svg class="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    Processing...
+                </span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Features Grid -->
+<div class="features-section">
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-purple">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+            </div>
+            <h3 class="feature-title">Advanced Analytics</h3>
+            <p class="feature-description">Section-wise breakdown, question type analysis, and detailed marking scheme insights</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+                </svg>
+            </div>
+            <h3 class="feature-title">Secure & Private</h3>
+            <p class="feature-description">CSRF protection and secure processing ensure your data remains confidential</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+            </div>
+            <h3 class="feature-title">Instant Results</h3>
+            <p class="feature-description">Automated analysis delivers comprehensive predictions in seconds</p>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-icon feature-icon-orange">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                </svg>
+            </div>
+            <h3 class="feature-title">Comprehensive Data</h3>
+            <p class="feature-description">MCQ/MSQ/NAT breakdown with positive, negative, and net marks calculation</p>
+        </div>
+    </div>
+</div>
+
+<!-- How it Works Section -->
+<div class="how-it-works">
+    <h2 class="section-title">How It Works</h2>
+    <div class="steps-grid">
+        <div class="step-card">
+            <div class="step-number">1</div>
+            <h3>Get Your URL</h3>
+            <p>Access your GATE response sheet from the official portal and copy the URL</p>
+        </div>
+        
+        <div class="step-arrow">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </div>
+        
+        <div class="step-card">
+            <div class="step-number">2</div>
+            <h3>Enter & Submit</h3>
+            <p>Paste the URL in the form above and click "Predict My Marks"</p>
+        </div>
+        
+        <div class="step-arrow">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </div>
+        
+        <div class="step-card">
+            <div class="step-number">3</div>
+            <h3>View Results</h3>
+            <p>Get detailed mark predictions with comprehensive analytics instantly</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Enhanced form submission with loading state
+    document.querySelector('.url-form-modern').addEventListener('submit', function(e) {
+        const submitBtn = this.querySelector('.btn-submit-modern');
+        submitBtn.classList.add('loading');
+        submitBtn.disabled = true;
+    });
+    
+    // Add focus effects
+    const input = document.querySelector('.form-input-modern');
+    if (input) {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
+        });
+    }
+</script>
+{% endblock %}
