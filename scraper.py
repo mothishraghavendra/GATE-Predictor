@@ -4,14 +4,20 @@ import re
 from urllib.parse import urlparse
 import json
 import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ResponseSheetScraper:
     """Submits URL to serblabs.in and scrapes the predicted marks result"""
     
-    def __init__(self, url, timeout=30):
+    def __init__(self, url, timeout=30, max_retries=3):
         self.response_sheet_url = url  # The URL user provides
         self.target_website = "https://serblabs.in/"  # The website to submit to
         self.timeout = timeout
+        self.max_retries = max_retries
         self.session = requests.Session()
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -169,7 +175,7 @@ class ResponseSheetScraper:
             return "Candidate"
             
         except Exception as e:
-            print(f"Error scraping candidate name: {str(e)}")
+            logger.error(f"Error scraping candidate name: {str(e)}")
             return "Candidate"
     
     def get_serblabs_page(self):
@@ -186,37 +192,126 @@ class ResponseSheetScraper:
         if not self.validate_url():
             raise ValueError("Invalid response sheet URL format")
         
-        try:
-            # serblabs.in uses a REST API endpoint /calculate
-            api_endpoint = self.target_website.rstrip('/') + '/calculate'
-            
-            # Prepare JSON payload as per their API
-            payload = {
-                'response_url': self.response_sheet_url
-            }
-            
-            # Update headers for JSON API submission
-            api_headers = self.headers.copy()
-            api_headers['Content-Type'] = 'application/json'
-            api_headers['Accept'] = 'application/json'
-            api_headers['Referer'] = self.target_website
-            api_headers['Origin'] = self.target_website.rstrip('/')
-            
-            # Submit to the API endpoint
-            response = self.session.post(
-                api_endpoint, 
-                json=payload,  # requests will handle JSON encoding
-                headers=api_headers, 
-                timeout=self.timeout
-            )
-            
-            response.raise_for_status()
-            
-            # The API returns JSON, so parse it
-            return response.json()
-            
-        except requests.RequestException as e:
-            raise Exception(f"Failed to submit to serblabs.in: {str(e)}")
+        last_error = None
+        
+        for attempt in range(self.max_retries):
+            try:
+                # serblabs.in uses a REST API endpoint /calculate
+                api_endpoint = self.target_website.rstrip('/') + '/calculate'
+                
+                # Prepare JSON payload as per their API
+                payload = {
+                    'response_url': self.response_sheet_url
+                }
+                
+                # Update headers for JSON API submission
+                api_headers = self.headers.copy()
+                api_headers['Content-Type'] = 'application/json'
+                api_headers['Accept'] = 'application/json'
+                api_headers['Referer'] = self.target_website
+                api_headers['Origin'] = self.target_website.rstrip('/')
+                
+                # Debug logging
+                logger.info(f"[Attempt {attempt + 1}/{self.max_retries}] Submitting to {api_endpoint}")
+                
+                # Submit to the API endpoint
+                response = self.session.post(
+                    api_endpoint, 
+                    json=payload,  # requests will handle JSON encoding
+                    headers=api_headers, 
+                    timeout=self.timeout
+                )
+                
+                # Debug logging
+                logger.info(f"Response Status: {response.status_code}")
+                logger.debug(f"Response Headers: {dict(response.headers)}")
+                logger.info(f"Response Length: {len(response.text)} bytes")
+                
+                response.raise_for_status()
+                
+                # Check if response is empty
+                if not response.text or len(response.text.strip()) == 0:
+                    raise Exception("Received empty response from serblabs.in API")
+                
+                # Check content type
+                content_type = response.headers.get('Content-Type', '')
+                if 'application/json' not in content_type:
+                    # Log the actual response for debugging
+                    response_preview = response.text[:500] if len(response.text) > 500 else response.text
+                    logger.warning(f"Unexpected content type: {content_type}")
+                    logger.warning(f"Response preview: {response_preview}")
+                    raise Exception(f"Invalid response format (expected JSON, got {content_type}). Response: {response_preview}")
+                
+                # Try to parse JSON with better error handling
+                try:
+                    json_data = response.json()
+                    logger.info(f"Successfully parsed JSON response")
+                    return json_data
+                except json.JSONDecodeError as je:
+                    response_preview = response.text[:500] if len(response.text) > 500 else response.text
+                    logger.error(f"JSON decode error: {str(je)}")
+                    logger.error(f"Response text: {response_preview}")
+                    raise Exception(f"Invalid JSON response from serblabs.in: {str(je)}. Response: {response_preview}")
+                
+            except requests.HTTPError as he:
+                # Handle HTTP errors specifically
+                status_code = he.response.status_code if hasattr(he, 'response') else 'unknown'
+                response_text = he.response.text[:500] if hasattr(he, 'response') and he.response.text else 'No response body'
+                last_error = f"HTTP {status_code} error from serblabs.in: {response_text}"
+                logger.error(f"HTTP Error on attempt {attempt + 1}: {last_error}")
+                
+                # Don't retry on 4xx client errors (except 429 rate limit)
+                if hasattr(he, 'response') and 400 <= he.response.status_code < 500 and he.response.status_code != 429:
+                    raise Exception(last_error)
+                    
+                # Wait before retry
+                if attempt < self.max_retries - 1:
+                    wait_time = (attempt + 1) * 2  # Exponential backoff
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    
+            except requests.Timeout:
+                last_error = f"Request timed out after {self.timeout} seconds. serblabs.in may be slow or unavailable."
+                logger.error(f"Timeout on attempt {attempt + 1}: {last_error}")
+                
+                # Wait before retry
+                if attempt < self.max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    
+            except requests.ConnectionError as ce:
+                last_error = f"Connection failed to serblabs.in. Please check your internet connection or the service may be down: {str(ce)}"
+                logger.error(f"Connection error on attempt {attempt + 1}: {last_error}")
+                
+                # Wait before retry
+                if attempt < self.max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    
+            except requests.RequestException as e:
+                last_error = f"Failed to submit to serblabs.in: {str(e)}"
+                logger.error(f"Request error on attempt {attempt + 1}: {last_error}")
+                
+                # Wait before retry
+                if attempt < self.max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"General error on attempt {attempt + 1}: {last_error}")
+                
+                # Wait before retry
+                if attempt < self.max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+        
+        # If we've exhausted all retries, raise the last error
+        raise Exception(f"Failed after {self.max_retries} attempts. Last error: {last_error}")
     
     def parse_serblabs_result(self, json_response):
         """Parse the JSON result from serblabs.in API to extract predicted marks"""
@@ -231,17 +326,38 @@ class ResponseSheetScraper:
             'raw_result': json_response
         }
         
+        # Validate json_response
+        if not json_response:
+            result_data['error'] = 'Empty API response'
+            return result_data
+        
         # If json_response is a string (error case), try to parse it
         if isinstance(json_response, str):
             try:
                 json_response = json.loads(json_response)
-            except:
-                result_data['error'] = 'Failed to parse API response'
+            except json.JSONDecodeError as e:
+                result_data['error'] = f'Failed to parse API response: {str(e)}'
+                return result_data
+        
+        # Check if the response indicates an error
+        if isinstance(json_response, dict):
+            if 'error' in json_response:
+                result_data['error'] = json_response['error']
+                return result_data
+            if 'message' in json_response and not json_response.get('summary'):
+                # If there's a message but no summary, might be an error
+                result_data['error'] = json_response['message']
                 return result_data
         
         # serblabs.in API returns: { "summary": {...}, "results": [...] }
         # Extract summary data
         summary = json_response.get('summary', {})
+        
+        if not summary:
+            # If no summary, the response might not be in the expected format
+            result_data['error'] = f'Unexpected API response format. Keys found: {list(json_response.keys()) if isinstance(json_response, dict) else "N/A"}'
+            result_data['raw_result'] = str(json_response)[:1000]
+            return result_data
         
         # Extract predicted marks (total_marks from summary)
         if 'total_marks' in summary:
@@ -360,61 +476,73 @@ class ResponseSheetScraper:
     
     def extract_responses(self):
         """Main method to submit URL to serblabs.in and extract predicted marks"""
-        # Submit the URL to serblabs.in API (returns JSON)
-        result_json = self.submit_to_serblabs()
-        
-        # Parse the JSON result from serblabs.in
-        result_data = self.parse_serblabs_result(result_json)
-        
-        # Sort questions by number if any
-        if result_data.get('questions'):
-            result_data['questions'].sort(key=lambda x: x.get('number', 0))
-        
-        # Calculate statistics from parsed data
-        # Use serblabs.in summary if available, otherwise calculate
-        total_questions = result_data.get('total_questions_count', len(result_data.get('questions', [])))
-        
-        # Try to get counts from serblabs summary first
-        correct = result_data.get('correct_count', 0)
-        wrong = result_data.get('wrong_count', 0)
-        unanswered = result_data.get('unanswered_count', 0)
-        
-        # Calculate attempted from questions if summary not available
-        if correct == 0 and wrong == 0 and result_data.get('questions'):
-            # Count from questions array
-            for q in result_data.get('questions', []):
-                if q.get('marked', False):
-                    status = q.get('status', '').lower()
-                    if 'correct' in status or q.get('score', 0) > 0:
-                        correct += 1
-                    elif 'wrong' in status or 'incorrect' in status:
-                        wrong += 1
+        try:
+            # Submit the URL to serblabs.in API (returns JSON)
+            result_json = self.submit_to_serblabs()
+            
+            # Parse the JSON result from serblabs.in
+            result_data = self.parse_serblabs_result(result_json)
+            
+            # Check if parsing resulted in an error
+            if 'error' in result_data and result_data['error']:
+                raise Exception(result_data['error'])
+            
+            # Sort questions by number if any
+            if result_data.get('questions'):
+                result_data['questions'].sort(key=lambda x: x.get('number', 0))
+            
+            # Calculate statistics from parsed data
+            # Use serblabs.in summary if available, otherwise calculate
+            total_questions = result_data.get('total_questions_count', len(result_data.get('questions', [])))
+            
+            # Try to get counts from serblabs summary first
+            correct = result_data.get('correct_count', 0)
+            wrong = result_data.get('wrong_count', 0)
+            unanswered = result_data.get('unanswered_count', 0)
+            
+            # Calculate attempted from questions if summary not available
+            if correct == 0 and wrong == 0 and result_data.get('questions'):
+                # Count from questions array
+                for q in result_data.get('questions', []):
+                    if q.get('marked', False):
+                        status = q.get('status', '').lower()
+                        if 'correct' in status or q.get('score', 0) > 0:
+                            correct += 1
+                        elif 'wrong' in status or 'incorrect' in status:
+                            wrong += 1
+                        else:
+                            # If status not clear, mark as attempted but unknown
+                            wrong += 1
                     else:
-                        # If status not clear, mark as attempted but unknown
-                        wrong += 1
-                else:
-                    unanswered += 1
+                        unanswered += 1
+            
+            attempted = correct + wrong
+            
+            # Ensure not_attempted is calculated correctly
+            if unanswered == 0 and total_questions > 0:
+                not_attempted = total_questions - attempted
+            else:
+                not_attempted = unanswered
+            
+            result_data['statistics'] = {
+                'total_questions': total_questions,
+                'attempted': attempted,
+                'not_attempted': not_attempted,
+                'correct': correct,
+                'wrong': wrong,
+                'unanswered': not_attempted
+            }
+            
+            # Add the original URL that was submitted
+            result_data['submitted_url'] = self.response_sheet_url
+            result_data['processed_by'] = self.target_website
+            
+            return result_data
         
-        attempted = correct + wrong
-        
-        # Ensure not_attempted is calculated correctly
-        if unanswered == 0 and total_questions > 0:
-            not_attempted = total_questions - attempted
-        else:
-            not_attempted = unanswered
-        
-        result_data['statistics'] = {
-            'total_questions': total_questions,
-            'attempted': attempted,
-            'not_attempted': not_attempted,
-            'correct': correct,
-            'wrong': wrong,
-            'unanswered': not_attempted
-        }
-        
-        # Add the original URL that was submitted
-        result_data['submitted_url'] = self.response_sheet_url
-        result_data['processed_by'] = self.target_website
-        
-        return result_data
+        except Exception as e:
+            # Re-raise with clear context
+            error_msg = str(e)
+            if "Failed to submit to serblabs.in" not in error_msg:
+                error_msg = f"Failed to process response sheet: {error_msg}"
+            raise Exception(error_msg)
 

@@ -4,12 +4,30 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, URL
 import os
+import logging
 from scraper import ResponseSheetScraper
 from predictor import MarkPredictor
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 csrf = CSRFProtect(app)
+
+# Configure Flask logging
+if not app.debug:
+    app.logger.setLevel(logging.INFO)
+    # Ensure logs go to stdout for cloud deployment platforms
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    app.logger.addHandler(handler)
 
 class URLForm(FlaskForm):
     response_sheet_url = StringField('Response Sheet URL', 
@@ -22,6 +40,7 @@ def index():
     form = URLForm()
     if form.validate_on_submit():
         url = form.response_sheet_url.data
+        logger.info(f"Processing request for URL: {url}")
         
         try:
             # Scrape the response sheet
@@ -29,13 +48,16 @@ def index():
             
             # Scrape candidate name from the original URL
             username = scraper.scrape_candidate_name()
+            logger.info(f"Scraped username: {username}")
             
             # Extract responses and predict marks
             response_data = scraper.extract_responses()
+            logger.info(f"Successfully extracted response data")
             
             # Predict marks
             predictor = MarkPredictor()
             predicted_marks = predictor.predict(response_data)
+            logger.info(f"Predicted marks: {predicted_marks}")
             
             return render_template('result.html', 
                                  url=url,
@@ -44,6 +66,7 @@ def index():
                                  username=username,
                                  form=URLForm())
         except Exception as e:
+            logger.error(f"Error processing URL {url}: {str(e)}", exc_info=True)
             return render_template('index.html', 
                                  form=form, 
                                  error=f"Error processing URL: {str(e)}")
