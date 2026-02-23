@@ -34,8 +34,6 @@ else:
     app.config['WTF_CSRF_ENABLED'] = False
     logger.info("Running in serverless mode - CSRF protection disabled")
 
-
-
 class URLForm(FlaskForm):
     response_sheet_url = StringField('Response Sheet URL', 
                                      validators=[DataRequired(), URL()],
